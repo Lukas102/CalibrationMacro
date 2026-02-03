@@ -63,13 +63,14 @@ Double_t fpeaks(Double_t *x, Double_t *par)
 
  
 //to read in and bound initial file
-void read(string filepath) {
+void read(string filepath, int l_cut,int u_cut) {
 
     string line;
     ifstream f(filepath);
 
     if (!f.is_open()) {
         cerr << "Error opening file: " << filepath << endl;
+        exit(EXIT_FAILURE);
         return;
     }
 
@@ -98,42 +99,32 @@ void read(string filepath) {
     }
     /////////////////////////////////////////////////////////////
 
-    
-    int cut = 3500;
-    int upper_cut = 4800;
-    
-    int nbins = high-low+1;
-
-    TH1F *hi = new TH1F("h","MAESTRO Spectrum",nbins,low,high);
 
     cout<< "CHECKPOINT 1" << endl;
     double counts;
-    int bin = 1;  
     
-    //fills histogram 
-    while(f >> counts && bin <= nbins){
-        hi->SetBinContent(bin, counts);
-        bin++;
-    }
+    //for initialization & bounds protection
+    if (l_cut< 0 || l_cut < low) l_cut = low;
+    if (u_cut < 0 || u_cut > high) u_cut = high;
 
-    // Check cuts are within histogram range
-    if (cut < low) cut = low;
-    if (upper_cut > high) upper_cut = high;
+    int ch = 0;
+    int nbins = u_cut - l_cut + 1; 
+
+    TH1F *h = new TH1F("h","MAESTRO Spectrum",nbins,low,high);
     
-    hi->GetXaxis()->SetRangeUser(cut, upper_cut);
-    
-    // Create canvas before drawing
-    TCanvas *c4 = new TCanvas("c4","Spectrum",800,600);
-    hi->Draw();
-    c4->Update();
+    while(f >> counts){
+        if(ch >= l_cut && ch <= u_cut){
+            h->SetBinContent(ch-l_cut+1, counts);
+        }
+        ch++;
+    }
     cout<< "CHECKPOINT 2" << endl;
-    
-    // Save to file
-    TFile out("spectra.root","RECREATE");
-    hi->Write();
-    out.Close();
+
+    h->Draw();
+    TFile c("spectra.root","RECREATE");
+    h->Write();
+    c.Close();
     cout<< "CHECKPOINT 3" << endl;
-    
 
 }
 
@@ -313,8 +304,24 @@ void FitFin(){
     //cin.ignore(numeric_limits<streamsize>::max(), '\n');
     getline(cin, filepath);
 
+    char again = 'n';
+    int l_cut = -1 , u_cut = -1;
+
+    do{
+
     //read func
-    read(filepath);
+    read(filepath,l_cut,u_cut);
+
+    //input 2
+    cout << "please input a lower bin threshold: ";
+    cin >> l_cut;
+    cout << "please input an upper bin threshold: ";
+    cin >> u_cut;
+
+    cout << "Do you want to run the intital thresholding again? (y/n): ";
+    cin >> again;
+
+    }while(again == 'y');
 
     // pulling histo from previously saved root file
     TFile i("spectra.root");
@@ -336,8 +343,6 @@ void FitFin(){
     int peaks_num;
     cout << "please input the number of peaks to search for: ";
     cin >> peaks_num;
-
-    char again = 'n';
 
     //user inputted search parameters
     double inpsigma = 1.0;
