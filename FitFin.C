@@ -13,10 +13,12 @@
 #include <TGraph.h>
 #include "TROOT.h"
 #include "TVirtualFitter.h"
+#include <fstream>
 #include <iostream>
 #include <array>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <vector>
 #include <tuple>
 
@@ -59,55 +61,83 @@ Double_t fpeaks(Double_t *x, Double_t *par)
     return cal;
  }
 
-/*
-TH1F* hist read() {
+ 
+//to read in and bound initial file
+void read(string filepath) {
 
-    ifstream f("/home/lukas/projects/rooting/Masters_documents/Marwan+Lukas SiPN Tests/Detector 1 2 mus 110 gain 70 V.Spe");
     string line;
+    ifstream f(filepath);
 
+    if (!f.is_open()) {
+        cerr << "Error opening file: " << filepath << endl;
+        return;
+    }
+
+    // Find marker & check if existent 
+    bool foundData = false;
     while(getline(f,line)){
-        if(line.find("$DATA") != string::npos)
+        if(line.find("$DATA") != string::npos){
+            foundData = true;
             break;
+        }
+    }
+    
+    if (!foundData) {
+        cerr << "Error: $DATA marker not found" << endl;
+        return;
     }
 
     int low, high;
     f >> low >> high;
 
+    //////////////////////////TEMP DEBUGG///////////////////////
+    // Validate bin count
+    if (high <= low) {
+        cerr << "Error: high (" << high << ") <= low (" << low << ")" << endl;
+        return;
+    }
+    /////////////////////////////////////////////////////////////
+
     
     int cut = 3500;
     int upper_cut = 4800;
     
-    int nbins = upper_cut - cut + 1;
-    //int nbins = high - low + 1;
+    int nbins = high-low+1;
 
+    TH1F *hi = new TH1F("h","MAESTRO Spectrum",nbins,low,high);
 
-    TH1F *h = new TH1F("h","MAESTRO Spectrum",nbins,low,high);
-
+    cout<< "CHECKPOINT 1" << endl;
     double counts;
-    int ch = 0;
-
-    while(f >> counts){
-
-        h->SetBinContent(ch-low+1, counts); 
+    int bin = 1;  
     
-        ch++;
+    //fills histogram 
+    while(f >> counts && bin <= nbins){
+        hi->SetBinContent(bin, counts);
+        bin++;
     }
 
-
+    // Check cuts are within histogram range
+    if (cut < low) cut = low;
+    if (upper_cut > high) upper_cut = high;
     
-    while(f >> counts){
-        if(ch >= cut && ch <= upper_cut){
-            h->SetBinContent(ch-cut+1, counts);
-        }
-        ch++;
-    }
+    hi->GetXaxis()->SetRangeUser(cut, upper_cut);
+    
+    // Create canvas before drawing
+    TCanvas *c4 = new TCanvas("c4","Spectrum",800,600);
+    hi->Draw();
+    c4->Update();
+    cout<< "CHECKPOINT 2" << endl;
+    
+    // Save to file
+    TFile out("spectra.root","RECREATE");
+    hi->Write();
+    out.Close();
+    cout<< "CHECKPOINT 3" << endl;
+    
 
-    h->Draw();
-    TFile c("spectra.root","RECREATE");
-    h->Write();
-    c.Close();
 }
-*/
+
+
 
 //to calibrate the histogram as required
 TH1F* calibration(TH1F* h, Double_t offset,Double_t gain, Double_t xmin,Double_t xmax) { //-> original histogram, new offset, new gain (per bin)
@@ -274,29 +304,22 @@ Fitresults Fitter(TH1F* h, Double_t sigma, Double_t thresh){
 
 void FitFin(){
 
-    /*
-    //~introduce read() func once FWHM extracted 
+    //giving filepath to desired spectra
     string filepath;
 
-    cout<< enter the full filepath: << endl;
+    cout << "enter the full filepath: " << endl;
 
-    cin >> filepath;
+    // Clearing any potential newline
+    //cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    getline(cin, filepath);
 
-    while(getline(f,filepath)){
-    if(filepath.find("$DATA") != string::npos)
-        break;
-    }
-    */
-
-    // pulling histo from previously saved root file
-    string filename;
-    cout << "Please enter the relevant root file to calibrate" << endl;
-    cin >> filename;
+    //read func
+    read(filepath);
 
     // pulling histo from previously saved root file
-    TFile i(filename.c_str());
+    TFile i("spectra.root");
     if (!i.IsOpen()) {
-    cout << "Error: Could not open spectra.root!" << endl;
+    cout << "Error: Could not open root file!" << endl;
     return;
     }
 
