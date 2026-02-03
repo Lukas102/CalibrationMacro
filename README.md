@@ -1,2 +1,2 @@
 # CalibrationMacro
-A C++ macro to calibrate spectra.
+A C++ ROOT macro to calibrate spectra.
