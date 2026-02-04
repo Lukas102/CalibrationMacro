@@ -1,7 +1,6 @@
 #ifndef FITFIN_C
 #define FITFIN_C
 
-
 #include <TFile.h>
 #include "TCanvas.h"
 #include "TMath.h"
@@ -63,7 +62,7 @@ Double_t fpeaks(Double_t *x, Double_t *par)
 
  
 //to read in and bound initial file
-void read(string filepath, int l_cut,int u_cut) {
+void read(string filepath, int l_cut,int u_cut, TCanvas* c1) {
 
     string line;
     ifstream f(filepath);
@@ -91,14 +90,11 @@ void read(string filepath, int l_cut,int u_cut) {
     int low, high;
     f >> low >> high;
 
-    //////////////////////////TEMP DEBUGG///////////////////////
     // Validate bin count
     if (high <= low) {
         cerr << "Error: high (" << high << ") <= low (" << low << ")" << endl;
         return;
     }
-    /////////////////////////////////////////////////////////////
-
 
     cout<< "CHECKPOINT 1" << endl;
     double counts;
@@ -110,7 +106,7 @@ void read(string filepath, int l_cut,int u_cut) {
     int ch = 0;
     int nbins = u_cut - l_cut + 1; 
 
-    TH1F *h = new TH1F("h","MAESTRO Spectrum",nbins,low,high);
+    TH1F *h = new TH1F("h","MAESTRO Spectrum",nbins,l_cut,u_cut+1);
     
     while(f >> counts){
         if(ch >= l_cut && ch <= u_cut){
@@ -120,9 +116,12 @@ void read(string filepath, int l_cut,int u_cut) {
     }
     cout<< "CHECKPOINT 2" << endl;
 
+    //remove previous histo
+    c1->Clear();     
     h->Draw();
     TFile c("spectra.root","RECREATE");
     h->Write();
+    c1->Update();
     c.Close();
     cout<< "CHECKPOINT 3" << endl;
 
@@ -301,16 +300,18 @@ void FitFin(){
     cout << "enter the full filepath: " << endl;
 
     // Clearing any potential newline
-    //cin.ignore(numeric_limits<streamsize>::max(), '\n');
     getline(cin, filepath);
 
     char again = 'n';
     int l_cut = -1 , u_cut = -1;
 
+    //for use in read()
+    TCanvas *c1 = new TCanvas("c1","original_histo",800,600);
+
     do{
 
     //read func
-    read(filepath,l_cut,u_cut);
+    read(filepath,l_cut,u_cut,c1);
 
     //input 2
     cout << "please input a lower bin threshold: ";
